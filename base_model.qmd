@@ -1,0 +1,27 @@
+---
+title: "base_model"
+format: html
+---
+
+
+Base Model Results
+---
+
+```{r}
+
+model_metrics = metric_set(
+  accuracy,
+  precision,
+  recall
+)
+
+model_metrics(td_results,
+              truth=drive_td,
+              estimate = .pred_class)
+conf_mat(
+  td_results,
+  truth = drive_td,
+  estimate = .pred_class
+)
+
+```

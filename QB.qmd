@@ -1,0 +1,154 @@
+---
+title: "QB"
+format: html
+---
+
+```{r}
+
+library(nflverse)
+library(tidyverse)
+library(tidymodels)
+
+pbp_raw = load_pbp(seasons = 2025)
+```
+
+Next
+
+```{r}
+
+pbp = pbp_raw |>
+  select(play_id,
+         game_id,
+         home_team,
+         away_team,
+         season_type,
+         week,
+         posteam,posteam_timeouts_remaining,
+         posteam_type,
+         defteam,defteam_timeouts_remaining,
+         yardline_100,
+         game_date,
+         quarter_seconds_remaining,
+         half_seconds_remaining,
+         game_seconds_remaining,
+         game_half, #Str "Half1" "Half2" "Overtime"
+         qtr,
+         quarter_end,
+         drive,
+         sp,
+         down,
+         goal_to_go,
+         time,
+         ydstogo,
+         ydsnet,
+         play_type,
+         yards_gained,
+         posteam_score,posteam_score_post,
+         defteam_score,defteam_score_post,
+         home_score,away_score,
+         score_differential,score_differential_post,
+         penalty,
+         fourth_down_converted,
+         fourth_down_failed,
+         incomplete_pass,complete_pass,passing_yards,
+         sack,
+         touchdown,
+         rush,pass,
+         play_type_nfl,
+         fixed_drive,
+         fixed_drive_result,
+         drive_time_of_possession,
+         drive_start_yard_line,
+         drive_end_yard_line,
+         drive_first_downs,
+         drive_play_count,
+         drive_yards_penalized,
+         desc
+  )
+```
+
+Separate by Drive
+
+```{r}
+
+pbp = pbp_raw |>
+  group_by(game_id,drive) |>
+  #find the play number for the plays for each drive
+  mutate(drive_play_num = row_number())
+
+```
+
+if play is last play of drive find out if they score a touchdown. then make a variable that has drive result. Goal is to use what happens over the course of the drive, for example number of plays, total number of yards, tome of possession, to predict whether or not the drive ends up with the offence scoring a touchdown.
+
+Other
+
+```{r}
+set.seed(123)
+
+pbp_drives = pbp |>
+  filter(!is.na(drive),
+         !is.na(yardline_100),
+         !is.na(ydstogo),
+         play_type %in% c("run","pass","punt","field_goal","qb_kneel","qb_spike")) |>
+  group_by(game_id,fixed_drive) |>
+  mutate(drive_td = factor(if_else(fixed_drive_result=="Touchdown",1,0),levels = c(1,0))) |>
+  ungroup()
+
+data_split = group_initial_split(pbp_drives,prop = 0.8,group = "game_id")
+train = training(data_split)
+test = testing(data_split)
+
+
+```
+
+```{r}
+
+td_recipe = recipe(drive_td ~ down + ydstogo + drive_play_num + yardline_100 +posteam_timeouts_remaining + defteam_timeouts_remaining + half_seconds_remaining,
+                   data = train) |>
+  step_mutate(down.=as.factor(down))
+
+td_model = logistic_reg() |>
+  set_engine("glm") |>
+  set_mode("classification")
+ 
+td_workflow = workflow() |>
+  add_recipe(td_recipe) |>
+  add_model(td_model)
+
+td_fit = fit(td_workflow,train)
+
+td_prob = predict(td_fit,
+                  test,
+                  type="prob")
+
+predicted_class = predict(td_fit,
+                          test,
+                          type = "class")
+
+td_results = bind_cols(
+  test,
+  td_prob,
+  predicted_class)
+
+```
+
+Model Results
+
+```{r}
+#model results
+
+model_metrics = metric_set(
+  accuracy,
+  precision,
+  recall
+)
+
+model_metrics(td_results,
+              truth=drive_td,
+              estimate = .pred_class)
+conf_mat(
+  td_results,
+  truth = drive_td,
+  estimate = .pred_class
+)
+```

@@ -1,0 +1,64 @@
+---
+title: "drivetime"
+format: html
+---
+
+```{r}
+library(nflverse)
+library(tidymodels)
+library(tidyverse)
+```
+
+```{r}
+pbp = load_pbp(2025)
+```
+
+```{r}
+#drives = pbp |>
+#  select(game_id,game_half,game_seconds_remaining,qtr,drive,quarter_seconds_remaining,half_seconds_remaining,quarter_end,drive_time_of_possession,time,play_type_nfl,play,play,play_id,desc,drive_ended_with_score,drive_play_count)
+
+pbp_1 = pbp |>
+  filter(play_id != 1) |>
+  group_by(game_id, game_half) |>
+  mutate(
+    time_elapsed = game_seconds_remaining - lead(game_seconds_remaining),
+    time_elapsed = if_else(quarter_end == 1 | time_elapsed < 0, NA_real_, time_elapsed
+  )) |>
+  ungroup() |>
+  
+  
+  
+  #creates summary drive variables
+  group_by(game_id, fixed_drive) |>
+  mutate(
+    qb_kneels = sum(qb_kneel), 
+    drive_top_after_play = cumsum(coalesce(time_elapsed, 0)),
+    drive_play_num = cumsum(play_type_nfl %in% c("PASS","RUSH","FIELD_GOAL","SACK")),
+    drive_first_downs = sum(first_down,na.rm = TRUE),
+    drive_rush_attempts = sum(rush_attempt,na.rm = TRUE),
+    drive_rushing_yards = sum(rushing_yards,na.rm = TRUE),
+    drive_pass_attempts = sum(pass_attempt,na.rm = TRUE),
+    drive_pass_yards = sum(passing_yards,na.rm = TRUE)
+  ) |>
+  ungroup()
+
+```
+
+```{r}
+
+#create a table for only plays that end drivs
+
+end_of_drive_plays = pbp_1 |>
+  filter(season_type=="REG") |>
+  slice_tail(n=1,by=c(game_id,fixed_drive))
+
+```
+
+```{r}
+total_drives <- pbp |>
+  filter(season_type == "REG", !is.na(fixed_drive)) |>
+  distinct(game_id, fixed_drive) |>
+  nrow()
+
+total_drives
+```
