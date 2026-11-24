@@ -217,46 +217,52 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>pbp <span class="ot">=</span> <span class="fu">load_pbp</span>(<span class="dv">2026</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>pbp <span class="ot">=</span> <span class="fu">load_pbp</span>(<span class="dv">2025</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>drives <span class="ot">=</span> pbp <span class="sc">|&gt;</span></span>
-<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(game_id,game_half,game_seconds_remaining,qtr,drive,quarter_seconds_remaining,half_seconds_remaining,quarter_end,drive_time_of_possession,time,play_type_nfl,play,play,play_id,desc)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="co">#drives = pbp |&gt;</span></span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="co">#  select(game_id,game_half,game_seconds_remaining,qtr,drive,quarter_seconds_remaining,half_seconds_remaining,quarter_end,drive_time_of_possession,time,play_type_nfl,play,play,play_id,desc,drive_ended_with_score,drive_play_count)</span></span>
 <span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>drives <span class="sc">|&gt;</span></span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>pbp_1 <span class="ot">=</span> pbp <span class="sc">|&gt;</span></span>
 <span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(play_id <span class="sc">!=</span> <span class="dv">1</span>) <span class="sc">|&gt;</span></span>
 <span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(game_id, game_half) <span class="sc">|&gt;</span></span>
 <span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
 <span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">time_elapsed =</span> game_seconds_remaining <span class="sc">-</span> <span class="fu">lead</span>(game_seconds_remaining),</span>
-<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">time_elapsed =</span> <span class="fu">if_else</span>(quarter_end <span class="sc">==</span> <span class="dv">1</span> <span class="sc">|</span> time_elapsed <span class="sc">&lt;</span> <span class="dv">0</span>, <span class="cn">NA_real_</span>, time_elapsed)</span>
-<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">time_elapsed =</span> <span class="fu">if_else</span>(quarter_end <span class="sc">==</span> <span class="dv">1</span> <span class="sc">|</span> time_elapsed <span class="sc">&lt;</span> <span class="dv">0</span>, <span class="cn">NA_real_</span>, time_elapsed</span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a>  )) <span class="sc">|&gt;</span></span>
 <span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">|&gt;</span></span>
-<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(game_id, drive) <span class="sc">|&gt;</span></span>
-<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">drive_top_after_play =</span> <span class="fu">cumsum</span>(<span class="fu">coalesce</span>(time_elapsed, <span class="dv">0</span>)),</span>
-<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">drive_play_num =</span> <span class="fu">cumsum</span>(play_type_nfl <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"PASS"</span>,<span class="st">"RUSH"</span>,<span class="st">"FIELD GOAL"</span>,<span class="st">"PUNT"</span>))</span>
-<span id="cb33-16"><a href="#cb33-16" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb33-17"><a href="#cb33-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">#creates summary drive variables</span></span>
+<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(game_id, fixed_drive) <span class="sc">|&gt;</span></span>
+<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">drive_top_after_play =</span> <span class="fu">cumsum</span>(<span class="fu">coalesce</span>(time_elapsed, <span class="dv">0</span>)),</span>
+<span id="cb33-16"><a href="#cb33-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">drive_play_num =</span> <span class="fu">cumsum</span>(play_type_nfl <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"PASS"</span>,<span class="st">"RUSH"</span>,<span class="st">"FIELD_GOAL"</span>,<span class="st">"SACK"</span>)),</span>
+<span id="cb33-17"><a href="#cb33-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">drive_first_downs =</span> <span class="fu">sum</span>(first_down,<span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb33-18"><a href="#cb33-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">drive_rush_attempts =</span> <span class="fu">sum</span>(rush_attempt,<span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb33-19"><a href="#cb33-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">drive_rushing_yards =</span> <span class="fu">sum</span>(rushing_yards,<span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb33-20"><a href="#cb33-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">drive_pass_attempts =</span> <span class="fu">sum</span>(pass_attempt,<span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb33-21"><a href="#cb33-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">drive_pass_yards =</span> <span class="fu">sum</span>(passing_yards,<span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb33-22"><a href="#cb33-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">drive_ends_with_td =</span> <span class="fu">as.integer</span>(<span class="fu">any</span>(touchdown <span class="sc">==</span> <span class="dv">1</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>))</span>
+<span id="cb33-23"><a href="#cb33-23" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb33-24"><a href="#cb33-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="co">#create a table for only plays that end drivs</span></span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>end_of_drive_plays <span class="ot">=</span> pbp_1 <span class="sc">|&gt;</span></span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season_type<span class="sc">==</span><span class="st">"REG"</span>,</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>        play_type<span class="sc">!=</span><span class="st">"extra_point"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_tail</span>(<span class="at">n=</span><span class="dv">1</span>,<span class="at">by=</span><span class="fu">c</span>(game_id,fixed_drive))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>End of Drive Plays</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>total_drives <span class="ot">&lt;-</span> pbp <span class="sc">|&gt;</span></span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season_type <span class="sc">==</span> <span class="st">"REG"</span>, <span class="sc">!</span><span class="fu">is.na</span>(fixed_drive)) <span class="sc">|&gt;</span></span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">distinct</span>(game_id, fixed_drive) <span class="sc">|&gt;</span></span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">nrow</span>()</span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a>total_drives</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code># A tibble: 26,243 × 17
-   game_id   game_half game_seconds_remaining   qtr drive quarter_seconds_rema…¹
-   &lt;chr&gt;     &lt;chr&gt;                      &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;                  &lt;dbl&gt;
- 1 2026_01_… Half1                       3600     1     1                    900
- 2 2026_01_… Half1                       3596     1     1                    896
- 3 2026_01_… Half1                       3558     1     1                    858
- 4 2026_01_… Half1                       3514     1     1                    814
- 5 2026_01_… Half1                       3510     1     1                    810
- 6 2026_01_… Half1                       3471     1     1                    771
- 7 2026_01_… Half1                       3428     1     1                    728
- 8 2026_01_… Half1                       3399     1     1                    699
- 9 2026_01_… Half1                       3361     1     1                    661
-10 2026_01_… Half1                       3321     1     1                    621
-# ℹ 26,233 more rows
-# ℹ abbreviated name: ¹​quarter_seconds_remaining
-# ℹ 11 more variables: half_seconds_remaining &lt;dbl&gt;, quarter_end &lt;dbl&gt;,
-#   drive_time_of_possession &lt;chr&gt;, time &lt;chr&gt;, play_type_nfl &lt;chr&gt;,
-#   play &lt;dbl&gt;, play_id &lt;dbl&gt;, desc &lt;chr&gt;, time_elapsed &lt;dbl&gt;,
-#   drive_top_after_play &lt;dbl&gt;, drive_play_num &lt;int&gt;</code></pre>
+<pre><code>[1] 5745</code></pre>
 </div>
 </div>
 

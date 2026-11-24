@@ -18,27 +18,29 @@ pbp = load_pbp(2025)
 #  select(game_id,game_half,game_seconds_remaining,qtr,drive,quarter_seconds_remaining,half_seconds_remaining,quarter_end,drive_time_of_possession,time,play_type_nfl,play,play,play_id,desc,drive_ended_with_score,drive_play_count)
 
 pbp_1 = pbp |>
-  filter(play_id != 1) |>
+  filter(play_id != 1,
+         season_type=="REG",
+         play_type!="extra_point") |>
   group_by(game_id, game_half) |>
   mutate(
     time_elapsed = game_seconds_remaining - lead(game_seconds_remaining),
     time_elapsed = if_else(quarter_end == 1 | time_elapsed < 0, NA_real_, time_elapsed
   )) |>
   ungroup() |>
-  
-  
-  
   #creates summary drive variables
   group_by(game_id, fixed_drive) |>
   mutate(
-    qb_kneels = sum(qb_kneel), 
     drive_top_after_play = cumsum(coalesce(time_elapsed, 0)),
     drive_play_num = cumsum(play_type_nfl %in% c("PASS","RUSH","FIELD_GOAL","SACK")),
     drive_first_downs = sum(first_down,na.rm = TRUE),
     drive_rush_attempts = sum(rush_attempt,na.rm = TRUE),
     drive_rushing_yards = sum(rushing_yards,na.rm = TRUE),
     drive_pass_attempts = sum(pass_attempt,na.rm = TRUE),
-    drive_pass_yards = sum(passing_yards,na.rm = TRUE)
+    drive_pass_yards = sum(passing_yards,na.rm = TRUE),
+    drive_ends_with_td = factor(
+      any(touchdown == 1, na.rm = TRUE),
+      levels = c(TRUE, FALSE)
+    )
   ) |>
   ungroup()
 
@@ -49,16 +51,78 @@ pbp_1 = pbp |>
 #create a table for only plays that end drivs
 
 end_of_drive_plays = pbp_1 |>
-  filter(season_type=="REG") |>
   slice_tail(n=1,by=c(game_id,fixed_drive))
+
+
 
 ```
 
+End of Drive Plays
+
 ```{r}
-total_drives <- pbp |>
-  filter(season_type == "REG", !is.na(fixed_drive)) |>
+total_drives <- pbp_1 |>
+  filter(!is.na(fixed_drive)) |>
   distinct(game_id, fixed_drive) |>
   nrow()
 
 total_drives
+```
+
+```{r}
+
+drives_split = group_initial_split(end_of_drive_plays,
+                                   group = game_id,
+                                   prop = 0.8)
+train_data = training(drives_split) 
+test_data = testing(drives_split)
+#folds = vfold_cv(train_data,v=5)
+folds = group_vfold_cv(train_data,group = game_id,v=5)
+
+log_mod <- logistic_reg() |>
+  set_engine("glm") |>
+  set_mode("classification")
+
+log_recipe <- recipe(drive_ends_with_td ~ drive_first_downs + 
+                       drive_rush_attempts +
+                       drive_rushing_yards +
+                       drive_pass_attempts +
+                       drive_pass_yards +
+                       drive_top_after_play,
+                     data = train_data)
+
+log_workflow <- workflow() |>
+  add_model(log_mod) |>
+  add_recipe(log_recipe)
+
+log_fit <- fit(log_workflow,
+               data = train_data)
+
+#Generate class predictions.
+class_pred <- predict(log_fit,
+                      test_data, type = "class")
+test_preds <- predict(log_fit, new_data = test_data, type = "prob") |>
+  bind_cols(test_data)
+
+predictions = bind_cols(test_data,class_pred)
+results = fit_resamples(
+  log_workflow,
+  resamples = folds,
+  metrics = metric_set(
+    accuracy,
+    recall,
+    f_meas)
+  )
+
+
+collect_metrics(results)
+
+conf_mat(
+  predictions,
+  truth = drive_ends_with_td,
+  estimate = .pred_class
+)
+
+test_preds |>
+  roc_curve(truth = drive_ends_with_td, .pred_TRUE) |>
+  autoplot()
 ```
